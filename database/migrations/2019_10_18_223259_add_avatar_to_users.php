@@ -4,7 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-class AddActiveStatusToUsers extends Migration
+class AddAvatarToUsers extends Migration
 {
     /**
      * Run the migrations.
@@ -15,9 +15,9 @@ class AddActiveStatusToUsers extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
             // if not exist, add the new column
-            if (!Schema::hasColumn('users', 'active_status')) {
-                $table->boolean('active_status')->default(0);
-            } 
+            if (!Schema::hasColumn('users', 'avatar')) {
+                $table->string('avatar')->default(config('chatify.user_avatar.default'));
+            }           
         });
     }
 
