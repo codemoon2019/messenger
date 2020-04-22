@@ -12,6 +12,8 @@ use App\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use DB;
+use File;
+use Storage;
 
 class MessagesController extends Controller
 {
@@ -94,7 +96,7 @@ class MessagesController extends Controller
      */
     public function download($fileName)
     {
-        $path = storage_path() . '/app/public/' . config('chatify.attachments.folder') . '/' . $fileName;
+        $path = 'storage/public/attachments/'.$fileName;
         if (file_exists($path)) {
             return Response::download($path, $fileName);
         } else {
@@ -122,13 +124,13 @@ class MessagesController extends Controller
 
             $file = $request->file('file');
             // if size less than 150MB
-            if ($file->getSize() < 150000000) {
+            if ($file->getSize() < 150000000){
                 if (in_array($file->getClientOriginalExtension(), $allowed)) {
                     // get attachment name
                     $attachment_title = $file->getClientOriginalName();
                     // upload attachment and store the new name
                     $attachment = Str::uuid() . "." . $file->getClientOriginalExtension();
-                    $file->storeAs("public/" . config('chatify.attachments.folder'), $attachment);
+                    $file->move(public_path('app/public/attachment/ticket'), $attachment);
                 } else {
                     $error_msg = "File extension not allowed!";
                 }
@@ -334,7 +336,7 @@ class MessagesController extends Controller
         for ($i = 0; $i < count($shared); $i++) {
             $sharedPhotos .= view('Chatify::layouts.listItem', [
                 'get' => 'sharedPhoto',
-                'image' => asset('storage/attachments/' . $shared[$i]),
+                'image' => $shared[$i],
             ])->render();
         }
         return Response::json([
@@ -385,16 +387,16 @@ class MessagesController extends Controller
             if ($file->getSize() < 150000000) {
                 if (in_array($file->getClientOriginalExtension(), $allowed_images)) {
                     // delete the older one
-                    if (Auth::user()->avatar != config('chatify.user_avatar.default')) {
-                        $path = storage_path('app/public/' . config('chatify.user_avatar.folder') . '/' . Auth::user()->avatar);
+                    if (Auth::user()->images != config('chatify.user_avatar.default')) {
+                        $path = storage_path('storage/'.Auth::user()->image);
                         if (file_exists($path)) {
                             @unlink($path);
                         }
                     }
                     // upload
-                    $avatar = Str::uuid() . "." . $file->getClientOriginalExtension();
-                    $update = User::where('id', Auth::user()->id)->update(['avatar' => $avatar]);
-                    $file->storeAs("public/" . config('chatify.user_avatar.folder'), $avatar);
+                    $avatar = Str::uuid().".".$file->getClientOriginalExtension();
+                    $update = User::where('id', Auth::user()->id)->update(['image' => $avatar]);
+                    $file->storeAs("/storage/images/", $avatar);
                     $success = $update ? 1 : 0;
                 } else {
                     $msg = "File extension not allowed!";
