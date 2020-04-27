@@ -7,6 +7,7 @@ use Chatify\Http\Models\Favorite;
 use Pusher\Pusher;
 use Illuminate\Support\Facades\Auth;
 use Exception;
+use DB;
 
 class ChatifyMessenger
 {
@@ -101,18 +102,48 @@ class ChatifyMessenger
     }
 
     /**
-     * Fetch message by id and return the message card
-     * view as a response.
+     * Fetching all the message     
      *
      * @param int $id
+     * @param string $type
      * @return array
      */
-    public function fetchMessage($id){
+    public function fetchMessage($id, $type){
+        //dd($type);
         $attachment = $attachment_type = $attachment_title = null;
-        $msg = Message::where('id',$id)->first();
-
+        //$msg = Message::whereIn('type', [$type])->where('id', $id)->first();
+        $msg = DB::table('messages')
+        ->select('*')
+        ->where('id', $id)
+        //->where('type', $type)
+        ->get()
+        ->first();
+        //->get()
+        //dd($msg->attachment);
+        $memberID = null;
+        $memberName = null;
+            //try{
+            $explodedMessage = explode('-', $msg->body);
+            /*}catch(Exeption $e){
+                dd($msg);
+            }*/    
+            if(count($explodedMessage) == 6){
+                if($explodedMessage[3] == 'added'){
+                    if($explodedMessage[0] != null){
+                        $selectTheAddedMember = DB::table('users')->where('id', $explodedMessage[0])
+                        ->get()
+                        ->first();
+                        $memberID = $explodedMessage[0];
+                        $memberName = $selectTheAddedMember->id == auth()->user()->id ? "You" : $selectTheAddedMember->first_name.' '.$selectTheAddedMember->first_name;
+                    }else{
+                        $memberID = null;
+                        $memberName = $explodedMessage[0];
+                    }
+                }    
+            }    
+        //dd($msg->attachment);
         // If message has attachment
-        if($msg->attachment){
+        if(isset($msg->attachment)){
             // Get attachment and attachment title
             $att = explode(',',$msg->attachment);
             $attachment       = $att[0];
@@ -123,17 +154,27 @@ class ChatifyMessenger
             $attachment_type = in_array($ext,$this->getAllowedImages()) ? 'image' : 'file';
         }
 
+        $selectTheUserInfo = DB::table('users')
+        ->select('*')
+        ->where('id', $msg->from_id)
+        ->get()
+        ->first();
+
         return [
             'id' => $msg->id,
+            'from_id_name' => $selectTheUserInfo->first_name.' '.$selectTheUserInfo->last_name,
             'from_id' => $msg->from_id,
             'to_id' => $msg->to_id,
             'message' => $msg->body,
             'attachment' => [$attachment, $attachment_title, $attachment_type],
-            'time' => $msg->created_at->diffForHumans(),
+            'time' => \Carbon\Carbon::parse($msg->created_at)->diffForHumans(),
             'fullTime' => $msg->created_at,
             'viewType' => ($msg->from_id == Auth::user()->id) ? 'sender' : 'default',
             'seen' => $msg->seen,
+            'member_id' => $memberID,
+            'member_name' => $memberName
         ];
+
     }
 
     /**
@@ -151,12 +192,13 @@ class ChatifyMessenger
     /**
      * Default fetch messages query between a Sender and Receiver.
      *
+     * @param string $type
      * @param int $user_id
      * @return Collection
      */
-    public function fetchMessagesQuery($user_id){
-        return Message::where('from_id',Auth::user()->id)->where('to_id',$user_id)
-                    ->orWhere('from_id',$user_id)->where('to_id',Auth::user()->id);
+    public function fetchMessagesQuery($user_id, $type){
+        return Message::where('type', $type)->where('from_id', Auth::user()->id)->orWhere('to_id', $user_id)
+                    ->orWhere('from_id',$user_id)->orWhere('to_id', Auth::user()->id);
     }
 
     /**
@@ -183,10 +225,11 @@ class ChatifyMessenger
      * @param int $user_id
      * @return bool
      */
-    public function makeSeen($user_id){
-        Message::Where('from_id',$user_id)
+    public function makeSeen($user_id, $type){
+        Message::where('type', $type)
+                ->where('from_id',$user_id)
                 ->where('to_id',Auth::user()->id)
-                ->where('seen',0)
+                ->where('seen', 0)
                 ->update(['seen' => 1]);
         return 1;
     }
@@ -197,8 +240,8 @@ class ChatifyMessenger
      * @param int $user_id
      * @return Collection
      */
-    public function getLastMessageQuery($user_id){
-        return self::fetchMessagesQuery($user_id)->orderBy('created_at','DESC')->latest()->first();
+    public function getLastMessageQuery($user_id, $type){
+        return self::fetchMessagesQuery($user_id, $type)->orderBy('created_at','DESC')->latest()->first();
     }
 
     /**
@@ -207,8 +250,8 @@ class ChatifyMessenger
      * @param int $user_id
      * @return Collection
      */
-    public function countUnseenMessages($user_id){
-        return Message::where('from_id',$user_id)->where('to_id',Auth::user()->id)->where('seen',0)->count();
+    public function countUnseenMessages($user_id, $type){
+        return Message::where('type', $type)->where('from_id',$user_id)->where('to_id',Auth::user()->id)->where('seen',0)->count();
     }
 
     /**
@@ -219,21 +262,50 @@ class ChatifyMessenger
      * @param Collection $user
      * @return void
      */
-    public function getContactItem($messenger_id, $user){
+    public function getContactItem($messenger_id, $user, $type){
+        
         // get last message
-        $lastMessage = self::getLastMessageQuery($user->id);
-
+        $lastMessage = self::getLastMessageQuery($user->id, $type);
         // Get Unseen messages counter
-        $unseenCounter = self::countUnseenMessages($user->id);
+        $unseenCounter = self::countUnseenMessages($user->id, $type);
+        
+        if($type == 'user'){
+            //dd($lastMessage->from_id);
+            $getTheUserInfo = DB::table('users')
+            ->select('*')
+            ->where('id', $user->id)
+            ->get()
+            ->first();
 
-        return view('Chatify::layouts.listItem', [
-            'get' => 'users',
-            'user' => $user,
-            'lastMessage' => $lastMessage,
-            'unseenCounter' => $unseenCounter,
-            'type'=>'user',
-            'id' => $messenger_id,
-        ])->render();
+            return view('Chatify::layouts.listItem', [
+                'get' => $type,
+                'user' => $user,
+                'from_name' => $getTheUserInfo->first_name.' '.$getTheUserInfo->last_name,
+                'lastMessage' => $lastMessage,
+                'unseenCounter' => $unseenCounter,
+                'type'=> $type,
+                'id' => $messenger_id,
+            ])->render();
+        }else{
+            //dd($lastMessage->id);
+            $getTheUserInfo = DB::table('chat_groups')
+            ->select('*')
+            ->where('id', $user->id)
+            ->get()
+            ->first();
+
+            return view('Chatify::layouts.listItem', [
+                'get' => $type,
+                'user' => $user,
+                'from_name' => $getTheUserInfo->group_chat_name,
+                'lastMessage' => $lastMessage,
+                'unseenCounter' => $unseenCounter,
+                'type'=> $type,
+                'id' => $messenger_id,
+            ])->render();
+        }
+        
+
     }
 
     /**
@@ -278,10 +350,10 @@ class ChatifyMessenger
      * @param int $user_id
      * @return array
      */
-    public function getSharedPhotos($user_id){
+    public function getSharedPhotos($user_id, $type){
         $images = array(); // Default
         // Get messages
-        $msgs = $this->fetchMessagesQuery($user_id)->orderBy('created_at','DESC');
+        $msgs = $this->fetchMessagesQuery($user_id, $type)->orderBy('created_at','DESC');
         if($msgs->count() > 0){
             foreach ($msgs->get() as $msg) {
                 // If message has attachment

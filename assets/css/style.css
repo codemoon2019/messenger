@@ -156,6 +156,12 @@ body{
   cursor: pointer;
   transition: background .10s;
 }
+.messenger-list-item-group{
+	margin: 0;
+	width: 100%;
+  cursor: pointer;
+  transition: background .10s;
+}
 .m-list-active span,
 .m-list-active  p{
 	color: #fff !important;
@@ -164,7 +170,14 @@ body{
 .messenger-list-item td{
 	padding: 10px;
 }
+.messenger-list-item-group td{
+	padding: 10px;
+}
 .messenger-list-item tr>td:first-child{
+	padding-right: 0;
+	width: 55px;
+}
+.messenger-list-item-group tr>td:first-child{
 	padding-right: 0;
 	width: 55px;
 }
@@ -173,7 +186,15 @@ body{
 	font-size: 14px;
 	font-weight: 600;
 }
+.messenger-list-item-group td p{
+	margin-bottom: 4px;
+	font-size: 14px;
+	font-weight: 600;
+}
 .messenger-list-item td p span{
+	float: right;
+}
+.messenger-list-item-group td p span{
 	float: right;
 }
 .messenger-list-item td span{
@@ -181,7 +202,19 @@ body{
 	font-weight: 400;
 	font-size: 13px;
 }
+.messenger-list-item-group td span{
+	color: #cacaca;
+	font-weight: 400;
+	font-size: 13px;
+}
 .messenger-list-item td b{
+	float: right;
+	color: #fff;
+	padding: 0px 4px;
+	border-radius: 20px;
+	font-size: 13px;
+}
+.messenger-list-item-group td b{
 	float: right;
 	color: #fff;
 	padding: 0px 4px;
@@ -337,6 +370,7 @@ body{
     height: 10px;
     display: inline-block;
 }
+
 .mc-sender{
 	direction: rtl;
 }
@@ -344,6 +378,7 @@ body{
 	direction: ltr;
   color: #fff !important;
 }
+
 .mc-sender p sub{
 	color: rgba(255, 255, 255, 0.67);
 }
@@ -491,11 +526,13 @@ body{
     border-radius: 20px;
     color: rgb(135, 147, 164);
 }
+
 .upload-avatar-details{
     font-size: 14px;
     color: #949ba5;
     display: none;
 }
+
 .upload-avatar-preview{
     position: relative;
     border: 1px solid #e0e0e0;
@@ -507,6 +544,29 @@ body{
     margin: 0;
     left: calc(50% - 20px);
 }
+
+.upload-group-avatar-details{
+  font-size: 14px;
+  color: #949ba5;
+  display: none;
+}
+.upload-group-avatar-preview{
+  position: relative;
+  border: 1px solid #e0e0e0;
+  margin: 20px auto;
+}
+.group-chat-success{
+  position: relative;
+  border: 1px solid #e0e0e0;
+  margin: 20px auto;
+}
+.upload-group-avatar-loading{
+  position: absolute;
+  top: calc(50% - 21px);
+  margin: 0;
+  left: calc(50% - 20px);
+}
+
 .divider{
     margin: 15px;
 }

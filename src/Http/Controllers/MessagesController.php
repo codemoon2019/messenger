@@ -11,6 +11,7 @@ use Chatify\Facades\ChatifyMessenger as Chatify;
 use App\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use Illuminate\Support\Arr;
 use DB;
 use File;
 use Storage;
@@ -72,18 +73,33 @@ class MessagesController extends Controller
         // Favorite
         $favorite = Chatify::inFavorite($request['id']);
 
+        if($request['type'] == 'group'){  
+            $fetch = DB::table('chat_groups')
+            ->select('*')
+            ->where('id', $request['id'])
+            ->get()
+            ->first();
+
+            // send the response
+            return Response::json([
+                'favorite' => $favorite,
+                'fetch' => $fetch,
+                'user_avatar' => $fetch->avatar,
+                'user_name' => $fetch->group_chat_name,
+            ]);
+        }
         // User data
         if ($request['type'] == 'user') {
             $fetch = User::where('id', $request['id'])->first();
+            
+            // send the response
+            return Response::json([
+                'favorite' => $favorite,
+                'fetch' => $fetch,
+                'user_avatar' => $fetch->image,
+                'user_name' => $fetch->first_name.' '.$fetch->last_name,
+            ]);
         }
-
-        // send the response
-        return Response::json([
-            'favorite' => $favorite,
-            'fetch' => $fetch,
-            'user_avatar' => $fetch->image,
-            'user_name' => $fetch->first_name.' '.$fetch->last_name,
-        ]);
 
     }
 
@@ -142,6 +158,7 @@ class MessagesController extends Controller
         if (!$error_msg) {
             // send to database
             $messageID = mt_rand(9, 999999999) + time();
+            
             Chatify::newMessage([
                 'id' => $messageID,
                 'type' => $request['type'],
@@ -150,26 +167,34 @@ class MessagesController extends Controller
                 'body' => trim(htmlentities($request['message'])),
                 'attachment' => ($attachment) ? $attachment . ',' . $attachment_title : null,
             ]);
-
-            // fetch message to send it with the response
-            $messageData = Chatify::fetchMessage($messageID);
-
+            
+            //try{
+                // fetch message to send it with the response
+                $messageData = Chatify::fetchMessage($messageID, $request['type']);
+            /*}catch(Exeption $e){
+                return $e;
+            }*/
+            
             // send to user using pusher
             Chatify::push('private-chatify', 'messaging', [
+                'type' => $request['type'],
                 'from_id' => Auth::user()->id,
                 'to_id' => $request['id'],
                 'message' => Chatify::messageCard($messageData, 'default')
             ]);
+            
         }
 
         // send the response
         return Response::json([
+            'type' => $request['type'],
             'status' => '200',
             'error' => $error_msg ? 1 : 0,
             'error_msg' => $error_msg,
             'message' => Chatify::messageCard(@$messageData),
             'tempID' => $request['temporaryMsgId'],
         ]);
+
     }
 
     /**
@@ -180,14 +205,19 @@ class MessagesController extends Controller
      */
     public function fetch(Request $request){
         $allMessages = null;
-        $query = Chatify::fetchMessagesQuery($request['id'])->orderBy('created_at', 'asc');
+        $query = Chatify::fetchMessagesQuery($request['id'], $request['type'])->orderBy('created_at', 'asc');
         $messages = $query->get();
         if ($query->count() > 0) {
             foreach ($messages as $message) {
-                $allMessages .= Chatify::messageCard(
-                    Chatify::fetchMessage($message->id)
-                );
+                //try{
+                    $allMessages .= Chatify::messageCard(
+                        Chatify::fetchMessage($message->id, $request['type'])
+                    );
+                /*}catch(Exception $e){
+                    dd($message);
+                }*/
             }
+            //dd($allMessages);
             return Response::json([
                 'count' => $query->count(),
                 'messages' => $allMessages,
@@ -195,7 +225,7 @@ class MessagesController extends Controller
         }
         return Response::json([
             'count' => $query->count(),
-            'messages' => '<p class="message-hint"><span>Say \'hi\' and start messaging</span></p>',
+            'messages' => '<p class="message-hint" style="margin-top:10px;"><span>Say \'hi\' and start messaging</span></p>',
         ]);
     }
 
@@ -206,7 +236,7 @@ class MessagesController extends Controller
      * @return void
      */
     public function seen(Request $request){
-        $seen = Chatify::makeSeen($request['id']);
+        $seen = Chatify::makeSeen($request['id'], $request['type']);
         return Response::json([
             'status' => $seen,
         ], 200);
@@ -219,27 +249,82 @@ class MessagesController extends Controller
      * @return JSON response
      */
     public function getContacts(Request $request){
-        $users = Message::join('users',  function ($join) {
-            $join->on('messages.from_id', '=', 'users.id')
-                ->orOn('messages.to_id', '=', 'users.id');
-            })
-            ->where('messages.from_id', Auth::user()->id)
-            ->orWhere('messages.to_id', Auth::user()->id)
+        
+        $Type = $request['type'];
+
+        if($Type == 'users'){
+            $Type = 'user';
+        }else{
+            $Type = 'group';
+        }
+
+        //dd($Type);
+
+        if($Type == "user"){
+            $users = Message::join('users',  function ($join) {
+                $join->on('messages.from_id', '=', 'users.id')
+                    ->orOn('messages.to_id', '=', 'users.id');
+                })
+                ->where('messages.type', $Type)
+                ->where('messages.from_id', Auth::user()->id)
+                ->orWhere('messages.to_id', Auth::user()->id)
+                ->orderBy('messages.created_at', 'desc')
+                ->get()
+                ->unique('id');   
+        }else{
+
+            $dataArray = array();
+            $selectAlltheGC = DB::table('chat_group_members')
+            ->select('*')
+            ->where('uid', Auth::user()->id)
+            ->get()
+            ->first();
+            /*foreach($selectAlltheGC as $GC){
+                $dataArray = Arr::prepend($dataArray, [$GC->group_chat_id]);
+            }*/
+            $users = Message::join('chat_groups',  function ($join) {
+                $join->on('messages.to_id', '=', 'chat_groups.id');
+                })
+                ->where('messages.type', $Type)
+                ->orWhere('messages.from_id', Auth::user()->id)
+                ->orWhere('messages.to_id', $selectAlltheGC->group_chat_id)
+                ->orderBy('messages.created_at', 'desc')
+                ->get()
+                ->unique('id');
+            /*$users = Message::join('chat_groups', 'chat_groups.id', '=', 'messages.to_id')
+            ->where('messages.type', $Type)
+            ->whereIn('messages.from_id', [Auth::user()->id])
+            ->orWhereIn('messages.to_id', $dataArray)
             ->orderBy('messages.created_at', 'desc')
             ->get()
-            ->unique('id');
+            ->unique('chat_groups.id');*/
+        }
+    
         if ($users->count() > 0) {
             $contacts = null;
             foreach ($users as $user) {
                 if ($user->id != Auth::user()->id) {
-                    $userCollection = User::where('id', $user->id)->first();
-                    $contacts .= Chatify::getContactItem($request['messenger_id'], $userCollection);
+                    if($Type == 'user'){
+                        $userCollection = User::where('id', $user->id)->first();
+                        $contacts .= Chatify::getContactItem($request['messenger_id'], $userCollection, $Type);
+                    }else{
+                        $userCollection = DB::table('chat_groups')
+                        ->where('id', $user->id)
+                        ->get()
+                        ->first();
+                        //$userCollection = User::where('id', $user->id)->first();
+                        $contacts .= Chatify::getContactItem($request['messenger_id'], $userCollection, $Type);
+                        //dd($contacts);
+                    }
                 }
             }
         }
+
+        //dd($contacts);
         return Response::json([
             'contacts' => $users->count() > 0 ? $contacts : '<br><p class="message-hint"><span>Your contact list is empty</span></p>',
         ], 200);
+
     }
 
     /**
@@ -249,11 +334,99 @@ class MessagesController extends Controller
      * @return JSON response
      */
     public function updateContactItem(Request $request){
+
         $userCollection = User::where('id', $request['user_id'])->first();
-        $contactItem = Chatify::getContactItem($request['messenger_id'], $userCollection);
+        $contactItem = Chatify::getContactItem($request['messenger_id'], $userCollection, $request['type']);
         return Response::json([
             'contactItem' => $contactItem,
         ], 200);
+
+    }
+
+    /**
+     * Search users
+     *
+     * @param Request $request
+     * @return JSON response
+     */
+    public function selectUsers(Request $request){
+
+        $search = $request->input('search');
+
+        $selectUsers = DB::table('users')
+        ->select('*')
+        ->where(DB::raw('CONCAT(first_name," ",last_name)'), 'LIKE', "%{$search}%")
+        ->get();
+        $dataArray = array();
+
+        foreach($selectUsers as $users){
+            $dataArray = Arr::prepend($dataArray, ["id" => $users->id, "name" => $users->first_name.' '.$users->last_name]);
+        }
+
+        return Response::json([    
+            'system_message' => 'success',
+            'data' => $dataArray,
+            'retrieving' => 'finish'            
+        ], 200);
+
+    }
+
+    /**
+     * Search users
+     *
+     * @param Request $request
+     * @return JSON response
+     */
+    public function updateGroupChatMembers(Request $request){
+        
+        $AddedMembers = $request->input('added_members');
+        $GroupChatID = $request->input('group');
+        $dataArray = array();
+
+        foreach($AddedMembers as $addMembers){
+            //$dataArray = Arr::prepend($dataArray, [ "info" => $addMembers ]);
+            $addNewMember = DB::table('chat_group_members')
+            ->insert([
+                'group_chat_id' => $GroupChatID,
+                'uid' => $addMembers,
+                'type' => 'Member'
+            ]);
+            
+            // send to database
+            $messageID = mt_rand(9, 999999999) + time();
+                
+            Chatify::newMessage([
+                'id' => $messageID,
+                'type' => 'group',
+                'from_id' => Auth::user()->id,
+                'to_id' => $GroupChatID,
+                'body' => $addMembers.'-GC-'.$GroupChatID.'-added-by-'.Auth::user()->id,
+                'attachment' => null,
+            ]);
+
+            // fetch message to send it with the response
+            //try{
+                $messageData = Chatify::fetchMessage($messageID, 'group');
+            /*}catch(Exeption $e){
+                return $e;
+            }*/
+
+            // send to user using pusher
+            Chatify::push('private-chatify', 'messaging', [
+                'type' => 'group',
+                'from_id' => Auth::user()->id,
+                'to_id' => $GroupChatID,
+                'message' => Chatify::messageCard($messageData, 'default')
+            ]);
+        
+        }
+
+        return Response::json([
+            "members" => $AddedMembers,
+            "data" => $dataArray,
+            "system_message" => 1
+        ],200);
+    
     }
 
     /**
@@ -306,15 +479,31 @@ class MessagesController extends Controller
      */
     public function search(Request $request){
         $getRecords = null;
+        $searchingMode = $request['searchingMode'];
         $input = trim(filter_var($request['input'], FILTER_SANITIZE_STRING));
-        $records = User::where(DB::raw('CONCAT(first_name," ",last_name)'), 'LIKE', "%{$input}%");
-        foreach ($records->get() as $record) {
-            $getRecords .= view('Chatify::layouts.listItem', [
-                'get' => 'search_item',
-                'type' => 'user',
-                'user' => $record,
-            ])->render();
+        
+        if($searchingMode == "users"){
+            $records = User::where(DB::raw('CONCAT(first_name," ",last_name)'), 'LIKE', "%{$input}%");
+            foreach ($records->get() as $record) {
+                $getRecords .= view('Chatify::layouts.listItem', [
+                    'get' => 'search_item',
+                    'type' => 'user',
+                    'user' => $record,
+                ])->render();
+            }
+        }else{
+            $records = DB::table('chat_groups')
+            ->select('*')
+            ->where('group_chat_name', 'LIKE', "%{$input}%");
+            foreach ($records->get() as $record) {
+                $getRecords .= view('Chatify::layouts.listItem', [
+                    'get' => 'search_item',
+                    'type' => 'group',
+                    'group' => $record,
+                ])->render();
+            }
         }
+
         return Response::json([
             'records' => $records->count() > 0
                 ? $getRecords
@@ -331,7 +520,7 @@ class MessagesController extends Controller
      */
     public function sharedPhotos(Request $request)
     {
-        $shared = Chatify::getSharedPhotos($request['user_id']);
+        $shared = Chatify::getSharedPhotos($request['user_id'], $request['type']);
         $sharedPhotos = null;
         for ($i = 0; $i < count($shared); $i++) {
             $sharedPhotos .= view('Chatify::layouts.listItem', [
@@ -432,4 +621,104 @@ class MessagesController extends Controller
             'status' => $update,
         ], 200);
     }
+
+    /**
+     * Create group chat
+     *
+     * @param Request $request
+     * @return void
+     */
+    public function createGroupChat(Request $request)
+    {
+        $GroupChatID = mt_rand(9, 999999999) + time();
+        $GroupChatName = $request->input('GroupChatName');
+        $GroupAvatar = $request->file('GroupChatAvatar');
+
+        if($GroupAvatar != null){
+             // allowed extensions
+             $allowed_images = Chatify::getAllowedImages();
+             $allowed_files  = Chatify::getAllowedFiles();
+             $allowed        = array_merge($allowed_images, $allowed_files);
+
+             // if size less than 150MB
+             if ($GroupAvatar->getSize() < 150000000){
+                 if (in_array($GroupAvatar->getClientOriginalExtension(), $allowed)) {
+                     // upload attachment and store the new name
+                     $Avatar = $GroupChatID.'.'.$GroupAvatar->getClientOriginalExtension();
+                     $GroupAvatar->move(public_path('storage/users_avatar'), $Avatar);
+                 } else {
+                     $error_msg = "File extension not allowed!";
+                 }
+             } else {
+                 $error_msg = "File size is too long!";
+             }
+        }else{
+            $Avatar = 'avatar.png';
+        }
+
+        $memberArray = [];
+        $favoriteByArray = [];
+
+
+        $GroupMember = json_encode(["group_member" => $memberArray]);
+        $FavoritedBy = json_encode(["favorited_by" => $favoriteByArray]);
+
+        $createGroupChat = DB::table('chat_groups')
+        ->insert([
+            'group_chat_id' => $GroupChatID,
+            'group_chat_name' => $GroupChatName,
+            'avatar' => $Avatar,
+            'create_by_name' => auth()->user()->first_name.' '.auth()->user()->last_name,
+            'create_by' => auth()->user()->id,
+            'favorited_by_id' => $FavoritedBy,
+            'group_chat_members' => $GroupMember,
+            'is_deleted' => 0
+        ]);
+        $id = DB::getPdo()->lastInsertId();
+        $groupChatMembers = DB::table('chat_group_members')
+        ->insert([
+            'group_chat_id' => $id,
+            'uid' => auth()->user()->id,
+            'type' => 'Administrator'
+        ]);
+
+        
+        // send to database
+        $messageID = mt_rand(9, 999999999) + time();
+            
+        Chatify::newMessage([
+            'id' => $messageID,
+            'type' => 'group',
+            'from_id' => Auth::user()->id,
+            'to_id' => $id,
+            'body' => 'GC-'.$id.'-created-by-'.Auth::user()->id,
+            'attachment' => null,
+        ]);
+        
+        //try{
+            // fetch message to send it with the response
+            $messageData = Chatify::fetchMessage($messageID, 'group');
+        /*}catch(Exeption $e){
+            return $e;
+        }*/
+        
+        // send to user using pusher
+        Chatify::push('private-chatify', 'messaging', [
+            'type' => 'group',
+            'from_id' => Auth::user()->id,
+            'to_id' => $id,
+            'message' => Chatify::messageCard($messageData, 'default')
+        ]);
+        
+        if($createGroupChat){
+            return Response::json([
+                "id" => $id,
+                "system_message" => 1,
+                "group_chat_name" => $GroupChatName,
+            ]);
+        }
+
+    }
+
+
 }
