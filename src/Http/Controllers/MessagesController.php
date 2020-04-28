@@ -523,6 +523,36 @@ class MessagesController extends Controller
 
     public function removeMember(Request $request){
         $ID = $request->input('ID');
+
+        $GroupChatID = DB::table('chat_group_members')
+        ->select('*')
+        ->where('id', $ID)
+        ->get()
+        ->first();
+
+        // send to database
+        $messageID = mt_rand(9, 999999999) + time();
+            
+        Chatify::newMessage([
+            'id' => $messageID,
+            'type' => 'group',
+            'from_id' => Auth::user()->id,
+            'to_id' => $GroupChatID->group_chat_id,
+            'body' => $GroupChatID->uid.'-GC-'.$GroupChatID->group_chat_id.'-removed-by-'.Auth::user()->id,
+            'attachment' => null,
+        ]);
+
+        $newID = 'group-'.$messageID;
+        $messageData = Chatify::fetchMessage($newID);
+
+        // send to user using pusher
+        Chatify::push('private-chatify', 'messaging', [
+            'type' => 'group',
+            'from_id' => Auth::user()->id,
+            'to_id' => $GroupChatID->group_chat_id,
+            'message' => Chatify::messageCard($messageData, 'default')
+        ]);
+
         $RemmoveMember = DB::table('chat_group_members')
         ->where('id', $ID)
         ->delete();
@@ -530,8 +560,10 @@ class MessagesController extends Controller
         if($RemmoveMember){
             return Response::json([
                 "system_message" => 1,
+                "messenger" => 'group_'.$GroupChatID->group_chat_id
             ]);
         }
+        
 
     }
     

@@ -147,6 +147,18 @@ class ChatifyMessenger
                                 $memberID = null;
                                 $memberName = $explodedMessage[0];
                             }
+                        }
+                        if($explodedMessage[3] == 'removed'){
+                            if($explodedMessage[0] != null){
+                                $selectTheAddedMember = DB::table('users')->where('id', $explodedMessage[0])
+                                ->get()
+                                ->first();
+                                $memberID = $explodedMessage[0];
+                                $memberName = $selectTheAddedMember->id == auth()->user()->id ? "You" : $selectTheAddedMember->first_name.' '.$selectTheAddedMember->last_name;
+                            }else{
+                                $memberID = null;
+                                $memberName = $explodedMessage[0];
+                            }
                         }    
                     }    
                 //dd($msg->attachment);
