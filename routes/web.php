@@ -91,10 +91,6 @@ Route::post('/updateSettings', 'MessagesController@updateSettings')->name('avata
 Route::post('/setActiveStatus', 'MessagesController@setActiveStatus')->name('activeStatus.set');
 
 
-
-
-
-
 /*
 * [Group] view by id
 */
@@ -107,3 +103,7 @@ Route::post('/createGroupChat', 'MessagesController@createGroupChat')->name('cre
 Route::post('/selectUsers', 'MessagesController@selectUsers')->name('select.users');
 
 Route::post('/updateGroupChatMembers', 'MessagesController@updateGroupChatMembers')->name('update.group.chat');
+
+Route::post('/listOfMembers', 'MessagesController@listOfMembers')->name('list.members');
+
+Route::post('/removeMember', 'MessagesController@removeMember')->name('remove.member');

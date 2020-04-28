@@ -168,9 +168,11 @@ class MessagesController extends Controller
                 'attachment' => ($attachment) ? $attachment . ',' . $attachment_title : null,
             ]);
             
+            $newID  = $request['type']."-".$messageID;
+
             //try{
                 // fetch message to send it with the response
-                $messageData = Chatify::fetchMessage($messageID, $request['type']);
+                $messageData = Chatify::fetchMessage($newID);
             /*}catch(Exeption $e){
                 return $e;
             }*/
@@ -187,13 +189,14 @@ class MessagesController extends Controller
 
         // send the response
         return Response::json([
-            'type' => $request['type'],
             'status' => '200',
             'error' => $error_msg ? 1 : 0,
             'error_msg' => $error_msg,
             'message' => Chatify::messageCard(@$messageData),
             'tempID' => $request['temporaryMsgId'],
-        ]);
+            'sample' => '200',
+            'type' => $request['type'],
+        ], 200);
 
     }
 
@@ -210,8 +213,9 @@ class MessagesController extends Controller
         if ($query->count() > 0) {
             foreach ($messages as $message) {
                 //try{
+                    $newID = $request['type'].'-'.$message->id;
                     $allMessages .= Chatify::messageCard(
-                        Chatify::fetchMessage($message->id, $request['type'])
+                        Chatify::fetchMessage($newID)
                     );
                 /*}catch(Exception $e){
                     dd($message);
@@ -272,32 +276,22 @@ class MessagesController extends Controller
                 ->get()
                 ->unique('id');   
         }else{
-
             $dataArray = array();
             $selectAlltheGC = DB::table('chat_group_members')
             ->select('*')
             ->where('uid', Auth::user()->id)
-            ->get()
-            ->first();
-            /*foreach($selectAlltheGC as $GC){
+            ->get();
+            foreach($selectAlltheGC as $GC){
                 $dataArray = Arr::prepend($dataArray, [$GC->group_chat_id]);
-            }*/
+            }
             $users = Message::join('chat_groups',  function ($join) {
                 $join->on('messages.to_id', '=', 'chat_groups.id');
                 })
                 ->where('messages.type', $Type)
-                ->orWhere('messages.from_id', Auth::user()->id)
-                ->orWhere('messages.to_id', $selectAlltheGC->group_chat_id)
+                ->whereIn('messages.to_id', $dataArray)
                 ->orderBy('messages.created_at', 'desc')
                 ->get()
                 ->unique('id');
-            /*$users = Message::join('chat_groups', 'chat_groups.id', '=', 'messages.to_id')
-            ->where('messages.type', $Type)
-            ->whereIn('messages.from_id', [Auth::user()->id])
-            ->orWhereIn('messages.to_id', $dataArray)
-            ->orderBy('messages.created_at', 'desc')
-            ->get()
-            ->unique('chat_groups.id');*/
         }
     
         if ($users->count() > 0) {
@@ -352,18 +346,32 @@ class MessagesController extends Controller
     public function selectUsers(Request $request){
 
         $search = $request->input('search');
+        $groupChat = $request->input('group_chat');
+        $dataArrayForExistingMembers = array();
+
+        $selectAllTheExistingMembers = DB::table('chat_group_members')
+        ->select('*')
+        ->where('group_chat_id', $groupChat)
+        ->get();
+
+        foreach($selectAllTheExistingMembers as $existingMembers){
+            $dataArrayForExistingMembers = Arr::prepend($dataArrayForExistingMembers, [$existingMembers->uid]);
+        }
 
         $selectUsers = DB::table('users')
         ->select('*')
+        ->whereNotIn('id', $dataArrayForExistingMembers)
         ->where(DB::raw('CONCAT(first_name," ",last_name)'), 'LIKE', "%{$search}%")
         ->get();
+
         $dataArray = array();
 
         foreach($selectUsers as $users){
             $dataArray = Arr::prepend($dataArray, ["id" => $users->id, "name" => $users->first_name.' '.$users->last_name]);
         }
 
-        return Response::json([    
+        return Response::json([
+            'dataArray' => $dataArrayForExistingMembers,    
             'system_message' => 'success',
             'data' => $dataArray,
             'retrieving' => 'finish'            
@@ -406,7 +414,8 @@ class MessagesController extends Controller
 
             // fetch message to send it with the response
             //try{
-                $messageData = Chatify::fetchMessage($messageID, 'group');
+                $newID = 'group-'.$messageID;
+                $messageData = Chatify::fetchMessage($newID);
             /*}catch(Exeption $e){
                 return $e;
             }*/
@@ -512,6 +521,50 @@ class MessagesController extends Controller
         ], 200);
     }
 
+    public function removeMember(Request $request){
+        $ID = $request->input('ID');
+        $RemmoveMember = DB::table('chat_group_members')
+        ->where('id', $ID)
+        ->delete();
+
+        if($RemmoveMember){
+            return Response::json([
+                "system_message" => 1,
+            ]);
+        }
+
+    }
+    
+    public function listOfMembers(Request $request){
+        $getRecords = null;
+        $GC = $request->input('group_chat');
+        $listGroupOfMembers = DB::table('chat_group_members')
+        ->select('*')
+        ->where('group_chat_id', $GC)
+        ->get();
+
+        $listGroupOfMembersCount = DB::table('chat_group_members')
+        ->select('*')
+        ->where('group_chat_id', $GC)
+        ->count();
+
+        foreach($listGroupOfMembers as $list){
+            $contact = User::where('id', $list->uid)->first();
+            $getRecords .= view('Chatify::layouts.listItem', [
+                'get' => 'list_of_members',
+                'contact' => $contact,
+                'type' => $list->type,
+                'list' => $list,
+            ])->render();
+        }
+
+        return Response::json([
+            'records' => $listGroupOfMembersCount > 0 ? $getRecords : '<p class="message-hint"><span>Nothing to show.</span></p>',
+            'addData' => 'html'
+        ], 200);
+
+    }
+
     /**
      * Get shared photos
      *
@@ -540,7 +593,7 @@ class MessagesController extends Controller
      * @return void
      */
     public function deleteConversation(Request $request){
-        $delete = Chatify::deleteConversation($request['id']);
+        $delete = Chatify::deleteConversation($request['id'], $request['type']);
         return Response::json([
             'deleted' => $delete ? 1 : 0,
         ], 200);
@@ -697,7 +750,8 @@ class MessagesController extends Controller
         
         //try{
             // fetch message to send it with the response
-            $messageData = Chatify::fetchMessage($messageID, 'group');
+            $newID = 'group-'.$messageID;
+            $messageData = Chatify::fetchMessage($newID);
         /*}catch(Exeption $e){
             return $e;
         }*/

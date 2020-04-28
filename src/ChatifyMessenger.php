@@ -105,76 +105,85 @@ class ChatifyMessenger
      * Fetching all the message     
      *
      * @param int $id
-     * @param string $type
+     * @param string $param
      * @return array
      */
-    public function fetchMessage($id, $type){
-        //dd($type);
+    public function fetchMessage($param){
+        $explodedParam = explode('-', $param);
+        $id = $explodedParam[1];
+        $type = $explodedParam[0];
+
         $attachment = $attachment_type = $attachment_title = null;
-        //$msg = Message::whereIn('type', [$type])->where('id', $id)->first();
+
         $msg = DB::table('messages')
         ->select('*')
         ->where('id', $id)
-        //->where('type', $type)
-        ->get()
+        ->whereIn('type', [$type])
         ->first();
-        //->get()
-        //dd($msg->attachment);
+
+        $msgCount = DB::table('messages')
+        ->select('*')
+        ->where('id', $id)
+        ->whereIn('type', [$type])
+        ->count();
         $memberID = null;
         $memberName = null;
-            //try{
-            $explodedMessage = explode('-', $msg->body);
-            /*}catch(Exeption $e){
-                dd($msg);
-            }*/    
-            if(count($explodedMessage) == 6){
-                if($explodedMessage[3] == 'added'){
-                    if($explodedMessage[0] != null){
-                        $selectTheAddedMember = DB::table('users')->where('id', $explodedMessage[0])
-                        ->get()
-                        ->first();
-                        $memberID = $explodedMessage[0];
-                        $memberName = $selectTheAddedMember->id == auth()->user()->id ? "You" : $selectTheAddedMember->first_name.' '.$selectTheAddedMember->first_name;
-                    }else{
-                        $memberID = null;
-                        $memberName = $explodedMessage[0];
-                    }
-                }    
-            }    
-        //dd($msg->attachment);
-        // If message has attachment
-        if(isset($msg->attachment)){
-            // Get attachment and attachment title
-            $att = explode(',',$msg->attachment);
-            $attachment       = $att[0];
-            $attachment_title = $att[1];
 
-            // determine the type of the attachment
-            $ext = pathinfo($attachment, PATHINFO_EXTENSION);
-            $attachment_type = in_array($ext,$this->getAllowedImages()) ? 'image' : 'file';
+        if($msgCount != 0){
+                //try{
+                    $explodedMessage = explode('-', $msg->body);
+                    /*}catch(Exeption $e){
+                        dd($msg);
+                    }*/    
+                    if(count($explodedMessage) == 6){
+                        if($explodedMessage[3] == 'added'){
+                            if($explodedMessage[0] != null){
+                                $selectTheAddedMember = DB::table('users')->where('id', $explodedMessage[0])
+                                ->get()
+                                ->first();
+                                $memberID = $explodedMessage[0];
+                                $memberName = $selectTheAddedMember->id == auth()->user()->id ? "You" : $selectTheAddedMember->first_name.' '.$selectTheAddedMember->last_name;
+                            }else{
+                                $memberID = null;
+                                $memberName = $explodedMessage[0];
+                            }
+                        }    
+                    }    
+                //dd($msg->attachment);
+                // If message has attachment
+                if(isset($msg->attachment)){
+                    // Get attachment and attachment title
+                    $att = explode(',',$msg->attachment);
+                    $attachment       = $att[0];
+                    $attachment_title = $att[1];
+        
+                    // determine the type of the attachment
+                    $ext = pathinfo($attachment, PATHINFO_EXTENSION);
+                    $attachment_type = in_array($ext,$this->getAllowedImages()) ? 'image' : 'file';
+                }
+        
+                $selectTheUserInfo = DB::table('users')
+                ->select('*')
+                ->where('id', $msg->from_id)
+                ->get()
+                ->first();
+            
+                return [
+                    'id' => $msg->id,
+                    'from_id_name' => $selectTheUserInfo->first_name.' '.$selectTheUserInfo->last_name,
+                    'from_id' => $msg->from_id,
+                    'to_id' => $msg->to_id,
+                    'message' => $msg->body,
+                    'attachment' => [$attachment, $attachment_title, $attachment_type],
+                    'time' => \Carbon\Carbon::parse($msg->created_at)->diffForHumans(),
+                    'fullTime' => $msg->created_at,
+                    'viewType' => $msg->from_id == Auth::user()->id ? 'sender' : 'default',
+                    'seen' => $msg->seen,
+                    'member_id' => $memberID,
+                    'member_name' => $memberName
+                ];
+        
         }
-
-        $selectTheUserInfo = DB::table('users')
-        ->select('*')
-        ->where('id', $msg->from_id)
-        ->get()
-        ->first();
-
-        return [
-            'id' => $msg->id,
-            'from_id_name' => $selectTheUserInfo->first_name.' '.$selectTheUserInfo->last_name,
-            'from_id' => $msg->from_id,
-            'to_id' => $msg->to_id,
-            'message' => $msg->body,
-            'attachment' => [$attachment, $attachment_title, $attachment_type],
-            'time' => \Carbon\Carbon::parse($msg->created_at)->diffForHumans(),
-            'fullTime' => $msg->created_at,
-            'viewType' => ($msg->from_id == Auth::user()->id) ? 'sender' : 'default',
-            'seen' => $msg->seen,
-            'member_id' => $memberID,
-            'member_name' => $memberName
-        ];
-
     }
 
     /**
@@ -197,8 +206,15 @@ class ChatifyMessenger
      * @return Collection
      */
     public function fetchMessagesQuery($user_id, $type){
-        return Message::where('type', $type)->where('from_id', Auth::user()->id)->orWhere('to_id', $user_id)
-                    ->orWhere('from_id',$user_id)->orWhere('to_id', Auth::user()->id);
+
+        if($type == 'group'){
+            return Message::where('type', $type)
+            ->where('to_id', $user_id);
+        }else{
+            return Message::whereIn('type', [$type])->where('from_id',Auth::user()->id)->where('to_id',$user_id)
+                    ->orWhere('from_id',$user_id)->where('to_id',Auth::user()->id);
+        }
+        
     }
 
     /**
@@ -375,9 +391,9 @@ class ChatifyMessenger
      * @param int $user_id
      * @return boolean
      */
-    public function deleteConversation($user_id){
+    public function deleteConversation($user_id, $type){
         try {
-            foreach ($this->fetchMessagesQuery($user_id)->get() as $msg) {
+            foreach ($this->fetchMessagesQuery($user_id, $type)->get() as $msg) {
                 // delete from database
                 $msg->delete();
                 // delete file attached if exist
