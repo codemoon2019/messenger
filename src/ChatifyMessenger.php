@@ -314,6 +314,7 @@ class ChatifyMessenger
                 'type'=> $type,
                 'id' => $messenger_id,
             ])->render();
+
         }else{
             //dd($lastMessage->id);
             $getTheUserInfo = DB::table('chat_groups')
@@ -322,15 +323,31 @@ class ChatifyMessenger
             ->get()
             ->first();
 
+            $explodedMessage = explode('-', $lastMessage->body);
+
+            $getNewMemberInfo = DB::table('users')
+            ->select('*')
+            ->where('id', $explodedMessage[0])
+            ->get()
+            ->first();
+
+            $getNewMemberInfoCount = DB::table('users')
+            ->select('*')
+            ->where('id', $explodedMessage[0])
+            ->count();
+
             return view('Chatify::layouts.listItem', [
                 'get' => $type,
                 'user' => $user,
+                'member_name' => $getNewMemberInfoCount != 0 ? $getNewMemberInfo->first_name.' '.$getNewMemberInfo->last_name : null,
+                'user_id' => $explodedMessage[0],
                 'from_name' => $getTheUserInfo->group_chat_name,
                 'lastMessage' => $lastMessage,
                 'unseenCounter' => $unseenCounter,
                 'type'=> $type,
                 'id' => $messenger_id,
             ])->render();
+
         }
         
 

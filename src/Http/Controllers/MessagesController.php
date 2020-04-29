@@ -146,7 +146,8 @@ class MessagesController extends Controller
                     $attachment_title = $file->getClientOriginalName();
                     // upload attachment and store the new name
                     $attachment = Str::uuid() . "." . $file->getClientOriginalExtension();
-                    $file->move(public_path('app/public/attachment/ticket'), $attachment);
+                    $file->move(public_path('storage/public/attachments'), $attachment);
+                    //$file->storeAs('storage/public/attachments', $attachment);
                 } else {
                     $error_msg = "File extension not allowed!";
                 }
