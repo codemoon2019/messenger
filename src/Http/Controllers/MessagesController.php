@@ -953,4 +953,22 @@ class MessagesController extends Controller
 
     }
 
+
+    public function leaveGroup(Request $request){
+
+        $ID = $request->input('ID');
+
+        $leaveTheGroup = DB::table('chat_group_members')
+        ->where('group_chat_id', $ID)
+        ->where('uid', auth()->user()->id)
+        ->delete();
+
+        if($leaveTheGroup){
+            return Response::json([
+                'system_message' => 1
+            ],200);
+        }
+
+    }
+
 }

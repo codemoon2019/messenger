@@ -111,3 +111,5 @@ Route::post('/removeMember', 'MessagesController@removeMember')->name('remove.me
 Route::post('/getTheGroupInfo', 'MessagesController@getTheGroupInfo')->name('get.group.info');
 
 Route::post('/updateGroupChat', 'MessagesController@updateGroupChat')->name('update.group.chat');
+
+Route::post('/leaveGroup', 'MessagesController@leaveGroup')->name('leave.group');
