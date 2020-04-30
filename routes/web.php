@@ -107,3 +107,7 @@ Route::post('/updateGroupChatMembers', 'MessagesController@updateGroupChatMember
 Route::post('/listOfMembers', 'MessagesController@listOfMembers')->name('list.members');
 
 Route::post('/removeMember', 'MessagesController@removeMember')->name('remove.member');
+
+Route::post('/getTheGroupInfo', 'MessagesController@getTheGroupInfo')->name('get.group.info');
+
+Route::post('/updateGroupChat', 'MessagesController@updateGroupChat')->name('update.group.chat');

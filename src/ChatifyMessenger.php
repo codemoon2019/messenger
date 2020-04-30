@@ -136,6 +136,18 @@ class ChatifyMessenger
                         dd($msg);
                     }*/    
                     if(count($explodedMessage) == 6){
+                        if($explodedMessage[3] == 'update'){
+                            if($explodedMessage[0] != null){
+                                $selectTheAddedMember = DB::table('users')->where('id', $explodedMessage[0])
+                                ->get()
+                                ->first();
+                                $memberID = $explodedMessage[0];
+                                $memberName = $selectTheAddedMember->id == auth()->user()->id ? "You" : $selectTheAddedMember->first_name.' '.$selectTheAddedMember->last_name;
+                            }else{
+                                $memberID = null;
+                                $memberName = $explodedMessage[0];
+                            }
+                        }
                         if($explodedMessage[3] == 'added'){
                             if($explodedMessage[0] != null){
                                 $selectTheAddedMember = DB::table('users')->where('id', $explodedMessage[0])
@@ -338,7 +350,8 @@ class ChatifyMessenger
 
             return view('Chatify::layouts.listItem', [
                 'get' => $type,
-                'user' => $user,
+                'user' => $getTheUserInfo,
+                'avatar' => $getTheUserInfo->avatar,
                 'member_name' => $getNewMemberInfoCount != 0 ? $getNewMemberInfo->first_name.' '.$getNewMemberInfo->last_name : null,
                 'user_id' => $explodedMessage[0],
                 'from_name' => $getTheUserInfo->group_chat_name,

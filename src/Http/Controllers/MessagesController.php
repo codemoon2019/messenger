@@ -502,8 +502,19 @@ class MessagesController extends Controller
                 ])->render();
             }
         }else{
+            $dataJoined = array();
+            $selectAllTheJoinedGroupChat = DB::table('chat_group_members')
+            ->select('*')
+            ->where('uid', auth()->user()->id)
+            ->get();
+
+            foreach($selectAllTheJoinedGroupChat as $joined){
+                $dataJoined = Arr::prepend($dataJoined, [$joined->group_chat_id]);
+            }
+
             $records = DB::table('chat_groups')
             ->select('*')
+            ->whereIn('id', $dataJoined)
             ->where('group_chat_name', 'LIKE', "%{$input}%");
             foreach ($records->get() as $record) {
                 $getRecords .= view('Chatify::layouts.listItem', [
@@ -581,6 +592,13 @@ class MessagesController extends Controller
         ->where('group_chat_id', $GC)
         ->count();
 
+        $getTheTypeOfUser = DB::table('chat_group_members')
+        ->select('*')
+        ->where('group_chat_id', $GC)
+        ->where('uid', auth()->user()->id)
+        ->get()
+        ->first();
+
         foreach($listGroupOfMembers as $list){
             $contact = User::where('id', $list->uid)->first();
             $getRecords .= view('Chatify::layouts.listItem', [
@@ -588,6 +606,7 @@ class MessagesController extends Controller
                 'contact' => $contact,
                 'type' => $list->type,
                 'list' => $list,
+                'member_type' => $getTheTypeOfUser->type,
             ])->render();
         }
 
@@ -663,15 +682,23 @@ class MessagesController extends Controller
                 if (in_array($file->getClientOriginalExtension(), $allowed_images)) {
                     // delete the older one
                     if (Auth::user()->images != config('chatify.user_avatar.default')) {
-                        $path = storage_path('storage/'.Auth::user()->image);
+                        $path = storage_path('/storage/user_profile/'.Auth::user()->image);
                         if (file_exists($path)) {
                             @unlink($path);
                         }
                     }
                     // upload
-                    $avatar = Str::uuid().".".$file->getClientOriginalExtension();
+
+                    $attachment = $request->file('avatar');
+                    $fileName = pathinfo($attachment->getClientOriginalName(), PATHINFO_FILENAME);
+                    $extension = $attachment->getClientOriginalExtension();
+                    $filenameToStore = str_replace(" ", "", $fileName).'_'. time() . '.'.$extension;
+                    $storagePath = Storage::disk('public')->putFileAs('user_profile', $attachment,  $filenameToStore, 'public');
+                    $avatar = '/storage/user_profile/'.$filenameToStore;
+
+                    //$avatar = Str::uuid().".".$file->getClientOriginalExtension();
                     $update = User::where('id', Auth::user()->id)->update(['image' => $avatar]);
-                    $file->storeAs("/storage/images/", $avatar);
+                    //$file->storeAs("/storage/images/", $avatar);
                     $success = $update ? 1 : 0;
                 } else {
                     $msg = "File extension not allowed!";
@@ -729,17 +756,22 @@ class MessagesController extends Controller
              // if size less than 150MB
              if ($GroupAvatar->getSize() < 150000000){
                  if (in_array($GroupAvatar->getClientOriginalExtension(), $allowed)) {
-                     // upload attachment and store the new name
-                     $Avatar = $GroupChatID.'.'.$GroupAvatar->getClientOriginalExtension();
-                     $GroupAvatar->move(public_path('storage/users_avatar'), $Avatar);
-                 } else {
+                 
+                    $attachment = $request->file('GroupChatAvatar');
+                    $fileName = pathinfo($attachment->getClientOriginalName(), PATHINFO_FILENAME);
+                    $extension = $attachment->getClientOriginalExtension();
+                    $filenameToStore = str_replace(" ", "", $fileName).'_'. time() . '.'.$extension;
+                    $storagePath = Storage::disk('public')->putFileAs('user_profile', $attachment,  $filenameToStore, 'public');
+                    $Avatar = '/storage/user_profile/'.$filenameToStore;
+
+                    } else {
                      $error_msg = "File extension not allowed!";
                  }
              } else {
                  $error_msg = "File size is too long!";
              }
         }else{
-            $Avatar = 'avatar.png';
+            $Avatar = 'https://icons-for-free.com/iconfiles/png/512/human+men+people+users+icon-1320196167246530600.png';
         }
 
         $memberArray = [];
@@ -807,5 +839,118 @@ class MessagesController extends Controller
 
     }
 
+     public function getTheGroupInfo(Request $request){
+        $ID = $request->input('ID');
+
+        $getTheGroupInfo = DB::table('chat_groups')
+        ->select('*')
+        ->where('id', $ID)
+        ->get()
+        ->first();
+
+        if($getTheGroupInfo){
+        return Response::json([
+                'group_chat_name' => $getTheGroupInfo->group_chat_name,
+                'avatar' => $getTheGroupInfo->avatar
+            ],200);
+        }
+
+     }
+    
+     /**
+     * Create group chat
+     *
+     * @param Request $request
+     * @return void
+     */
+    public function updateGroupChat(Request $request)
+    {
+        $GroupChatID = $request->input('ID');
+        $GroupChatName = $request->input('GroupChatName');
+        $GroupAvatar = $request->file('GroupChatAvatar');
+
+        if($GroupAvatar != null){
+             // allowed extensions
+             $allowed_images = Chatify::getAllowedImages();
+             $allowed_files  = Chatify::getAllowedFiles();
+             $allowed        = array_merge($allowed_images, $allowed_files);
+
+             // if size less than 150MB
+             if ($GroupAvatar->getSize() < 150000000){
+                 if (in_array($GroupAvatar->getClientOriginalExtension(), $allowed)) {
+                 
+                    $attachment = $request->file('GroupChatAvatar');
+                    $fileName = pathinfo($attachment->getClientOriginalName(), PATHINFO_FILENAME);
+                    $extension = $attachment->getClientOriginalExtension();
+                    $filenameToStore = str_replace(" ", "", $fileName).'_'. time() . '.'.$extension;
+                    $storagePath = Storage::disk('public')->putFileAs('user_profile', $attachment,  $filenameToStore, 'public');
+                    $Avatar = '/storage/user_profile/'.$filenameToStore;
+                    
+                    } else {
+                     $error_msg = "File extension not allowed!";
+                 }
+             } else {
+                 $error_msg = "File size is too long!";
+             }
+        }else{
+            $getTheGroupChatInfo = DB::table('chat_groups')
+            ->select('*')
+            ->where('id', $GroupChatID)
+            ->get()
+            ->first();
+            $Avatar = $getTheGroupChatInfo->avatar;
+        }
+
+        $memberArray = [];
+        $favoriteByArray = [];
+
+
+        $GroupMember = json_encode(["group_member" => $memberArray]);
+        $FavoritedBy = json_encode(["favorited_by" => $favoriteByArray]);
+
+        $createGroupChat = DB::table('chat_groups')
+        ->where('id', $GroupChatID)
+        ->update([
+            'group_chat_name' => $GroupChatName,
+            'avatar' => $Avatar,
+        ]);
+        
+        // send to database
+        $messageID = mt_rand(9, 999999999) + time();
+            
+        Chatify::newMessage([
+            'id' => $messageID,
+            'type' => 'group',
+            'from_id' => Auth::user()->id,
+            'to_id' => $GroupChatID,
+            'body' => 'GC-'.$GroupChatID.'-update-by-'.Auth::user()->id,
+            'attachment' => null,
+        ]);
+        
+        //try{
+            // fetch message to send it with the response
+            $newID = 'group-'.$messageID;
+            $messageData = Chatify::fetchMessage($newID);
+        /*}catch(Exeption $e){
+            return $e;
+        }*/
+        
+        // send to user using pusher
+        Chatify::push('private-chatify', 'messaging', [
+            'type' => 'group',
+            'from_id' => Auth::user()->id,
+            'to_id' => $GroupChatID,
+            'message' => Chatify::messageCard($messageData, 'default')
+        ]);
+        
+        if($createGroupChat){
+            return Response::json([
+                "id" => $GroupChatID,
+                "system_message" => 1,
+                "group_chat_name" => $GroupChatName,
+            ]);
+        }
+
+    }
 
 }
