@@ -348,9 +348,24 @@ class ChatifyMessenger
             ->where('id', $explodedMessage[0])
             ->count();
 
+            $lastID = end($explodedMessage);
+
+            $getTheLeaverInfo = DB::table('users')
+            ->select('*')
+            ->where('id', $lastID)
+            ->get()
+            ->first();
+
+            $getTheLeaverInfoCount = DB::table('users')
+            ->select('*')
+            ->where('id', $lastID)
+            ->count();
+
+
             return view('Chatify::layouts.listItem', [
                 'get' => $type,
                 'user' => $getTheUserInfo,
+                'from_user_name' => $getTheLeaverInfoCount != 0 ? $getTheLeaverInfo->first_name.' '.$getTheLeaverInfo->last_name : null,
                 'avatar' => $getTheUserInfo->avatar,
                 'member_name' => $getNewMemberInfoCount != 0 ? $getNewMemberInfo->first_name.' '.$getNewMemberInfo->last_name : null,
                 'user_id' => $explodedMessage[0],

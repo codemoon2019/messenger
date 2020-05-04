@@ -964,6 +964,34 @@ class MessagesController extends Controller
         ->delete();
 
         if($leaveTheGroup){
+             // send to database
+            $messageID = mt_rand(9, 999999999) + time();
+                
+            Chatify::newMessage([
+                'id' => $messageID,
+                'type' => 'group',
+                'from_id' => Auth::user()->id,
+                'to_id' => $ID,
+                'body' => 'GC-'.$ID.'-leave-by-'.Auth::user()->id,
+                'attachment' => null,
+            ]);
+            
+            //try{
+                // fetch message to send it with the response
+                $newID = 'group-'.$messageID;
+                $messageData = Chatify::fetchMessage($newID);
+            /*}catch(Exeption $e){
+                return $e;
+            }*/
+            
+            // send to user using pusher
+            Chatify::push('private-chatify', 'messaging', [
+                'type' => 'group',
+                'from_id' => Auth::user()->id,
+                'to_id' => $ID,
+                'message' => Chatify::messageCard($messageData, 'default')
+            ]);        
+
             return Response::json([
                 'system_message' => 1
             ],200);
