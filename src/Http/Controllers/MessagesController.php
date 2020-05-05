@@ -358,12 +358,43 @@ class MessagesController extends Controller
         foreach($selectAllTheExistingMembers as $existingMembers){
             $dataArrayForExistingMembers = Arr::prepend($dataArrayForExistingMembers, [$existingMembers->uid]);
         }
+        $dataArrayForExistingMembers = Arr::prepend($dataArrayForExistingMembers, [auth()->user()->id]);
 
-        $selectUsers = DB::table('users')
-        ->select('*')
-        ->whereNotIn('id', $dataArrayForExistingMembers)
-        ->where(DB::raw('CONCAT(first_name," ",last_name)'), 'LIKE', "%{$search}%")
-        ->get();
+                $dataArray = array();
+                $companyArray = array();
+
+                $findTheCompanies = DB::table('user_companies')
+                ->select('*')
+                ->where('user_id', auth()->user()->id)
+                ->get();
+
+                foreach($findTheCompanies as $companies){
+                    $companyArray = Arr::prepend($companyArray, [$companies->company_id]);
+                }
+
+                $findTheDepartment = DB::table('user_types')
+                ->select('*')
+                ->whereIn('company_id', $companyArray)
+                ->get();
+                foreach($findTheDepartment as $department){
+                    $dataArray = Arr::prepend($dataArray, [$department->id]);
+                }
+
+        if(auth()->user()->company_id != -1){
+            $selectUsers = DB::table('users')
+            ->select('*')
+            ->whereNotIn('id', $dataArrayForExistingMembers)
+            ->whereIn('user_type_id', $dataArray)
+            ->where(DB::raw('CONCAT(first_name," ",last_name)'), 'LIKE', "%{$search}%")
+            ->get();
+        }else{
+            $selectUsers = DB::table('users')
+            ->select('*')
+            ->whereNotIn('id', $dataArrayForExistingMembers)
+            ->where(DB::raw('CONCAT(first_name," ",last_name)'), 'LIKE', "%{$search}%")
+            ->get();
+        }
+        
 
         $dataArray = array();
 
@@ -493,7 +524,36 @@ class MessagesController extends Controller
         $input = trim(filter_var($request['input'], FILTER_SANITIZE_STRING));
         
         if($searchingMode == "users"){
-            $records = User::where(DB::raw('CONCAT(first_name," ",last_name)'), 'LIKE', "%{$input}%");
+            if(auth()->user()->company_id != -1){
+                $dataArray = array();
+                $companyArray = array();
+
+                $findTheCompanies = DB::table('user_companies')
+                ->select('*')
+                ->where('user_id', auth()->user()->id)
+                ->get();
+
+                foreach($findTheCompanies as $companies){
+                    $companyArray = Arr::prepend($companyArray, [$companies->company_id]);
+                }
+
+                $findTheDepartment = DB::table('user_types')
+                ->select('*')
+                ->whereIn('company_id', $companyArray)
+                ->get();
+                foreach($findTheDepartment as $department){
+                    $dataArray = Arr::prepend($dataArray, [$department->id]);
+                }
+                $records = User::whereNotIn('id', [auth()->user()->id])
+                ->whereIn('user_type_id', $dataArray)
+                ->where(DB::raw('CONCAT(first_name," ",last_name)'), 'LIKE', "%{$input}%");
+
+            }else{
+                $records = User::where(DB::raw('CONCAT(first_name," ",last_name)'), 'LIKE', "%{$input}%");
+            }
+            
+
+
             foreach ($records->get() as $record) {
                 $getRecords .= view('Chatify::layouts.listItem', [
                     'get' => 'search_item',
@@ -501,6 +561,7 @@ class MessagesController extends Controller
                     'user' => $record,
                 ])->render();
             }
+
         }else{
             $dataJoined = array();
             $selectAllTheJoinedGroupChat = DB::table('chat_group_members')

@@ -18,7 +18,7 @@ class ChatifyMessenger
      * @var
      */
     public static $allowed_images = array('png','jpg','jpeg','gif');
-    public static $allowed_files  = array('zip','rar','txt');
+    public static $allowed_files  = array('zip','rar','txt','pdf','doc','docx','ppt','pptx','xls','xlsx');
 
     /**
      * This method returns the allowed image extensions
@@ -194,12 +194,15 @@ class ChatifyMessenger
             
                 return [
                     'id' => $msg->id,
+                    //'first_date' => $firstMessageIndicator->created_at,
                     'from_id_name' => $selectTheUserInfo->first_name.' '.$selectTheUserInfo->last_name,
                     'from_id' => $msg->from_id,
                     'to_id' => $msg->to_id,
                     'message' => $msg->body,
                     'attachment' => [$attachment, $attachment_title, $attachment_type],
-                    'time' => \Carbon\Carbon::parse($msg->created_at)->diffForHumans(),
+                    //'time' => \Carbon\Carbon::parse($msg->created_at)->diffForHumans(),
+                    'date' => \Carbon\Carbon::parse($msg->created_at)->format('l F,dy'),
+                    'time' => \Carbon\Carbon::parse($msg->created_at)->format('l F d, y g:i:s a'),
                     'fullTime' => $msg->created_at,
                     'viewType' => $msg->from_id == Auth::user()->id ? 'sender' : 'default',
                     'seen' => $msg->seen,
