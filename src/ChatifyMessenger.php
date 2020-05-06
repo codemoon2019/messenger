@@ -191,7 +191,17 @@ class ChatifyMessenger
                 ->where('id', $msg->from_id)
                 ->get()
                 ->first();
-            
+                
+                $formattedDate = \Carbon\Carbon::parse($msg->created_at);
+
+                if($formattedDate->isToday()){
+                    $Date = 'Today at '.\Carbon\Carbon::parse($msg->created_at)->format('g:i:s a');
+                }elseif($formattedDate->isYesterday()){
+                    $Date = 'Yesterday at '.\Carbon\Carbon::parse($msg->created_at)->format('g:i:s a');
+                }else{
+                    $Date = \Carbon\Carbon::parse($msg->created_at)->format('l F d, yy').' at '.\Carbon\Carbon::parse($msg->created_at)->format('g:i:s a');
+                }
+        
                 return [
                     'id' => $msg->id,
                     //'first_date' => $firstMessageIndicator->created_at,
@@ -202,7 +212,7 @@ class ChatifyMessenger
                     'attachment' => [$attachment, $attachment_title, $attachment_type],
                     //'time' => \Carbon\Carbon::parse($msg->created_at)->diffForHumans(),
                     'date' => \Carbon\Carbon::parse($msg->created_at)->format('l F,dy'),
-                    'time' => \Carbon\Carbon::parse($msg->created_at)->format('l F d, y g:i:s a'),
+                    'time' => $Date,
                     'fullTime' => $msg->created_at,
                     'viewType' => $msg->from_id == Auth::user()->id ? 'sender' : 'default',
                     'seen' => $msg->seen,
