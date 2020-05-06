@@ -193,13 +193,13 @@ class ChatifyMessenger
                 ->first();
                 
                 $formattedDate = \Carbon\Carbon::parse($msg->created_at);
-
+                $formattedTime = \Carbon\Carbon::parse($msg->created_at)->setTimezone('Asia/Manila');
                 if($formattedDate->isToday()){
-                    $Date = 'Today at '.\Carbon\Carbon::parse($msg->created_at)->format('g:i:s a');
+                    $Date = 'Today at '.$formattedTime->format('g:i:s a');
                 }elseif($formattedDate->isYesterday()){
-                    $Date = 'Yesterday at '.\Carbon\Carbon::parse($msg->created_at)->format('g:i:s a');
+                    $Date = 'Yesterday at '.$formattedTime->format('g:i:s a');
                 }else{
-                    $Date = \Carbon\Carbon::parse($msg->created_at)->format('l F d, yy').' at '.\Carbon\Carbon::parse($msg->created_at)->format('g:i:s a');
+                    $Date = \Carbon\Carbon::parse($msg->created_at)->format('l F d, yy').' at '.$formattedTime->format('g:i:s a');
                 }
         
                 return [
@@ -210,7 +210,7 @@ class ChatifyMessenger
                     'to_id' => $msg->to_id,
                     'message' => $msg->body,
                     'attachment' => [$attachment, $attachment_title, $attachment_type],
-                    //'time' => \Carbon\Carbon::parse($msg->created_at)->diffForHumans(),
+                    'moment' => $formattedTime->diffForHumans(),
                     'date' => \Carbon\Carbon::parse($msg->created_at)->format('l F,dy'),
                     'time' => $Date,
                     'fullTime' => $msg->created_at,
