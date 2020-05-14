@@ -186,6 +186,26 @@ class MessagesController extends Controller
                 'message' => Chatify::messageCard($messageData, 'default')
             ]);
             
+            $selectCountUnseenMessage = DB::table('messages')
+            ->where(function($query){
+                $query->orWhere('to_id', auth()->user()->id);
+            })
+            ->where('seen', 0)
+            ->count();
+
+            if($selectCountUnseenMessage != 0){
+                $dataCounter = '<label id="notif-count-msgs" class="label-danger notif-count-extras">'.$selectCountUnseenMessage.'</label>';
+            }else{
+                $dataCounter = '';
+            }
+
+            // send to user using pusher
+            Chatify::push('my-channel', 'my-event', [
+                'data' => $dataCounter,
+                'status' => $request['id'] == auth()->user()->id ? 1 : 0,
+                'name' => auth()->user()->first_name.' '.auth()->user()->last_name
+            ]);
+            
         }
 
         // send the response
