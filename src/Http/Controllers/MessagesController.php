@@ -199,12 +199,33 @@ class MessagesController extends Controller
                 $dataCounter = '';
             }
 
-            // send to user using pusher
-            Chatify::push('my-channel', 'my-event', [
-                'data' => $dataCounter,
-                'status' => $request['id'] == auth()->user()->id ? 1 : 0,
-                'name' => auth()->user()->first_name.' '.auth()->user()->last_name
-            ]);
+            if($request['type'] == 'user'){
+                // send to user using pusher
+                Chatify::push('my-channel', 'my-event', [
+                    'data' => $dataCounter,
+                    'status' => $request['id'] == auth()->user()->id ? 1 : 0,
+                    'name' => auth()->user()->first_name.' '.auth()->user()->last_name,
+                    'type' => 'user'
+                ]);
+                
+            }else{
+                $findIfTheUserWasMemberInGC = DB::table('chat_group_members')
+                ->select('*')
+                ->where('group_chat_id', $request['id'])
+                ->where('uid', auth()->user()->id)
+                ->get()
+                ->first();
+                if($findIfTheUserWasMemberInGC){
+                    // send to user using pusher
+                    Chatify::push('my-channel', 'my-event', [
+                        'data' => $dataCounter,
+                        'from' => auth()->user()->id,
+                        'name' => auth()->user()->first_name.' '.auth()->user()->last_name,
+                        'type' => 'group'
+                    ]);
+                }
+            }
+            
             
         }
 
@@ -1076,6 +1097,7 @@ class MessagesController extends Controller
             return Response::json([
                 'system_message' => 1
             ],200);
+
         }
 
     }
