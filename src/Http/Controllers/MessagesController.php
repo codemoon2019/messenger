@@ -421,6 +421,8 @@ class MessagesController extends Controller
                 foreach($findTheDepartment as $department){
                     $dataArray = Arr::prepend($dataArray, [$department->id]);
                 }
+                $dataArray = Arr::prepend($dataArray, [11]);
+                $dataArray = Arr::prepend($dataArray, [14]);
 
         if(auth()->user()->company_id != -1){
             $selectUsers = DB::table('users')
@@ -578,8 +580,6 @@ class MessagesController extends Controller
                 foreach($findTheCompanies as $companies){
                     $companyArray = Arr::prepend($companyArray, [$companies->company_id]);
                 }
-                
-                $companyArray = Arr::prepend($companyArray, [-1]);
 
                 $findTheDepartment = DB::table('user_types')
                 ->select('*')
@@ -588,10 +588,11 @@ class MessagesController extends Controller
                 foreach($findTheDepartment as $department){
                     $dataArray = Arr::prepend($dataArray, [$department->id]);
                 }
+                $dataArray = Arr::prepend($dataArray, [11]);
+                $dataArray = Arr::prepend($dataArray, [14]);
                 $records = User::whereNotIn('id', [auth()->user()->id])
                 ->whereIn('user_type_id', $dataArray)
                 ->where(DB::raw('CONCAT(first_name," ",last_name)'), 'LIKE', "%{$input}%");
-
             }else{
                 $records = User::where(DB::raw('CONCAT(first_name," ",last_name)'), 'LIKE', "%{$input}%");
             }
