@@ -203,6 +203,7 @@ class MessagesController extends Controller
                 // send to user using pusher
                 Chatify::push('my-channel', 'my-event', [
                     'data' => $dataCounter,
+                    'to_id' => $request['id'],
                     'status' => $request['id'] == auth()->user()->id ? 1 : 0,
                     'name' => auth()->user()->first_name.' '.auth()->user()->last_name,
                     'type' => 'user'
@@ -577,6 +578,8 @@ class MessagesController extends Controller
                 foreach($findTheCompanies as $companies){
                     $companyArray = Arr::prepend($companyArray, [$companies->company_id]);
                 }
+                
+                $companyArray = Arr::prepend($companyArray, [-1]);
 
                 $findTheDepartment = DB::table('user_types')
                 ->select('*')
