@@ -210,21 +210,21 @@ class MessagesController extends Controller
                 ]);
                 
             }else{
-                $findIfTheUserWasMemberInGC = DB::table('chat_group_members')
-                ->select('*')
-                ->where('group_chat_id', $request['id'])
-                ->where('uid', auth()->user()->id)
-                ->get()
-                ->first();
-                if($findIfTheUserWasMemberInGC){
+                    $GroupInfo = DB::table('chat_groups')
+                    ->select('*')
+                    ->where('id', $request['id'])
+                    ->get()
+                    ->first();
+
                     // send to user using pusher
                     Chatify::push('my-channel', 'my-event', [
                         'data' => $dataCounter,
-                        'from' => auth()->user()->id,
+                        'from' => $request['id'],
                         'name' => auth()->user()->first_name.' '.auth()->user()->last_name,
+                        'group_name' => $GroupInfo->group_chat_name,
                         'type' => 'group'
                     ]);
-                }
+                
             }
             
             
