@@ -224,6 +224,93 @@ class ChatifyMessenger
     }
 
     /**
+     * Get user list's item data [Contact Itme]
+     * (e.g. User data, Last message, Unseen Counter...)
+     *
+     * @param int $messenger_id
+     * @param Collection $user
+     * @return void
+     */
+    public function getContactItemMobile($messenger_id, $user, $type){
+        
+        // get last message
+        $lastMessage = self::getLastMessageQuery($user->id, $type);
+        // Get Unseen messages counter
+        $unseenCounter = self::countUnseenMessages($user->id, $type);
+        
+        if($type == 'user'){
+            //dd($lastMessage->from_id);
+            $getTheUserInfo = DB::table('users')
+            ->select('*')
+            ->where('id', $user->id)
+            ->get()
+            ->first();
+
+            return [
+                'get' => $type,
+                'user' => $user,
+                'from_name' => $getTheUserInfo->first_name.' '.$getTheUserInfo->last_name,
+                'lastMessage' => $lastMessage,
+                'unseenCounter' => $unseenCounter,
+                'type'=> $type,
+                'id' => $messenger_id,
+            ];
+
+        }else{
+            //dd($lastMessage->id);
+            $getTheUserInfo = DB::table('chat_groups')
+            ->select('*')
+            ->where('id', $user->id)
+            ->get()
+            ->first();
+
+            $explodedMessage = explode('-', $lastMessage->body);
+
+            $getNewMemberInfo = DB::table('users')
+            ->select('*')
+            ->where('id', $explodedMessage[0])
+            ->get()
+            ->first();
+
+            $getNewMemberInfoCount = DB::table('users')
+            ->select('*')
+            ->where('id', $explodedMessage[0])
+            ->count();
+
+            $lastID = end($explodedMessage);
+
+            $getTheLeaverInfo = DB::table('users')
+            ->select('*')
+            ->where('id', $lastID)
+            ->get()
+            ->first();
+
+            $getTheLeaverInfoCount = DB::table('users')
+            ->select('*')
+            ->where('id', $lastID)
+            ->count();
+
+
+            return  [
+                'get' => $type,
+                'user' => $getTheUserInfo,
+                'from_user_name' => $getTheLeaverInfoCount != 0 ? $getTheLeaverInfo->first_name.' '.$getTheLeaverInfo->last_name : null,
+                'avatar' => $getTheUserInfo->avatar,
+                'member_name' => $getNewMemberInfoCount != 0 ? $getNewMemberInfo->first_name.' '.$getNewMemberInfo->last_name : null,
+                'user_id' => $explodedMessage[0],
+                'from_name' => $getTheUserInfo->group_chat_name,
+                'lastMessage' => $lastMessage,
+                'unseenCounter' => $unseenCounter,
+                'type'=> $type,
+                'id' => $messenger_id,
+            ];
+
+        }
+        
+
+    }
+
+    /**
      * Return a message card with the given data.
      *
      * @param array $data
