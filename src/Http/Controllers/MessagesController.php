@@ -183,6 +183,7 @@ class MessagesController extends Controller
                 'type' => $request['type'],
                 'from_id' => Auth::user()->id,
                 'to_id' => $request['id'],
+                'message_card_mobile' => $messageData,
                 'message' => Chatify::messageCard($messageData, 'default')
             ]);
             
