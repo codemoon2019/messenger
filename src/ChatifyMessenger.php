@@ -17,7 +17,7 @@ class ChatifyMessenger
      *
      * @var
      */
-    public static $allowed_images = array('png','jpg','jpeg','gif');
+    public static $allowed_images = array('PNG','JPG','png','jpg','jpeg','gif');
     public static $allowed_files  = array('zip','rar','txt','pdf','doc','docx','ppt','pptx','xls','xlsx');
 
     /**
