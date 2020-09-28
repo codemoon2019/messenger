@@ -245,8 +245,8 @@ class MessagesController extends Controller
      * @return JSON response
      */
     public function fetch(Request $request){
-        $allMessages = null;
 
+        $allMessages = null;
         if(!isset($request['last_date']) || $request['last_date'] == null){
             $query = Chatify::fetchMessagesQuery($request['id'], $request['type'])->where('created_at', '<', Carbon::now())->orderBy('created_at', 'desc')->limit(20);       
             $lastDate = $query->get()->reverse()->first()->created_at;
@@ -276,6 +276,7 @@ class MessagesController extends Controller
                 'last_date' => ''
             ]);
         }
+
     
     }
 
