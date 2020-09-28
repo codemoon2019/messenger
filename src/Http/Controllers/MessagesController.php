@@ -1,6 +1,6 @@
 <?php
 
-namespace Chatify\Http\Controllers;
+namespace App\Http\Controllers\Chatify;
 
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -15,6 +15,7 @@ use Illuminate\Support\Arr;
 use DB;
 use File;
 use Storage;
+use Carbon\Carbon;
 
 class MessagesController extends Controller
 {
@@ -38,6 +39,7 @@ class MessagesController extends Controller
                 $authData
             );
         }
+        
         return new Response('Unauthorized', 401);
     }
 
@@ -171,12 +173,7 @@ class MessagesController extends Controller
             
             $newID  = $request['type']."-".$messageID;
 
-            //try{
-                // fetch message to send it with the response
-                $messageData = Chatify::fetchMessage($newID);
-            /*}catch(Exeption $e){
-                return $e;
-            }*/
+            $messageData = Chatify::fetchMessage($newID);
             
             // send to user using pusher
             Chatify::push('private-chatify', 'messaging', [
@@ -224,11 +221,8 @@ class MessagesController extends Controller
                         'name' => auth()->user()->first_name.' '.auth()->user()->last_name,
                         'group_name' => $GroupInfo->group_chat_name,
                         'type' => 'group'
-                    ]);
-                
+                    ]);   
             }
-            
-            
         }
 
         // send the response
@@ -252,29 +246,37 @@ class MessagesController extends Controller
      */
     public function fetch(Request $request){
         $allMessages = null;
-        $query = Chatify::fetchMessagesQuery($request['id'], $request['type'])->orderBy('created_at', 'asc');
-        $messages = $query->get();
+
+        if(!isset($request['last_date']) || $request['last_date'] == null){
+            $query = Chatify::fetchMessagesQuery($request['id'], $request['type'])->where('created_at', '<=', Carbon::now())->orderBy('created_at', 'desc')->limit(20);       
+            $lastDate = $query->get()->reverse()->first()->created_at;
+        }else{
+            $query = Chatify::fetchMessagesQuery($request['id'], $request['type'])->where('created_at', '<=', $request['last_date'])->orderBy('created_at', 'desc')->limit(20);       
+            $lastDate = $query->get()->reverse()->first()->created_at;
+        }
+     
+        $messages = $query->get()->reverse();
         if ($query->count() > 0) {
             foreach ($messages as $message) {
-                //try{
                     $newID = $request['type'].'-'.$message->id;
                     $allMessages .= Chatify::messageCard(
                         Chatify::fetchMessage($newID)
                     );
-                /*}catch(Exception $e){
-                    dd($message);
-                }*/
             }
-            //dd($allMessages);
             return Response::json([
                 'count' => $query->count(),
                 'messages' => $allMessages,
+                'last_date' => $lastDate
+            ]);
+
+        }else{
+            return Response::json([
+                'count' => $query->count(),
+                'messages' => '<p class="message-hint" style="margin-top:10px;"><span>Say \'hi\' and start messaging</span></p>',
+                'last_date' => ''
             ]);
         }
-        return Response::json([
-            'count' => $query->count(),
-            'messages' => '<p class="message-hint" style="margin-top:10px;"><span>Say \'hi\' and start messaging</span></p>',
-        ]);
+    
     }
 
     /**
@@ -597,8 +599,6 @@ class MessagesController extends Controller
             }else{
                 $records = User::where(DB::raw('CONCAT(first_name," ",last_name)'), 'LIKE', "%{$input}%");
             }
-            
-
 
             foreach ($records->get() as $record) {
                 $getRecords .= view('Chatify::layouts.listItem', [
@@ -1106,5 +1106,6 @@ class MessagesController extends Controller
         }
 
     }
+
 
 }
