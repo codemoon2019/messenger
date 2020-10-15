@@ -1,5 +1,5 @@
 {
-    "name": "codemoon2019/chatify",
+    "name": "codemoon2019/messenger",
     "description": "A package for Laravel PHP Framework to add a complete real-time chat system.",
     "type": "library",
     "keywords": ["laravel", "messenger", "conversations", "chat", "php", "pusher", "realtime", "real-time"],
